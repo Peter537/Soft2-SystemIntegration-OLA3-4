@@ -1,0 +1,38 @@
+@startuml C4-SystemContext
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+title MyTrailer - System Context (Mobile Integration)
+
+Person(customer, "Mobile Customer", "Uses mobile app for short-term trailer rentals")
+Person(partner, "Partner Staff", "Manages trailers via existing web portal")
+Person(webCustomer, "Web Customer", "Uses existing web platform for long-term rentals")
+
+System_Boundary(mobile, "Mobile Solution (New)") {
+    System(mobileApp, "Mobile App", "iOS/Android app for short-term rentals with GPS location services")
+    System(mobileServices, "Mobile Services", "Mobile-specific booking, location, and notification services")
+}
+
+System_Boundary(existing, "Existing MyTrailer Platform") {
+    System(webPlatform, "Web Platform", "Existing long-term rental system with inventory and partner management")
+    System(inventorySystem, "Inventory System", "Existing trailer inventory and location management")
+    System(paymentSystem, "Payment System", "Existing payment processing and billing")
+}
+
+System_Ext(paymentProvider, "Payment Provider", "External payment processing (Nets/Stripe)")
+System_Ext(mobileOS, "Mobile Push Services", "Apple/Google push notification services")
+
+Rel(customer, mobileApp, "Books short-term rentals")
+Rel(partner, webPlatform, "Manages trailers and locations")
+Rel(webCustomer, webPlatform, "Books long-term rentals")
+
+Rel(mobileApp, mobileServices, "API calls", "HTTPS")
+Rel(mobileServices, inventorySystem, "Queries trailer availability", "API")
+Rel(mobileServices, paymentSystem, "Processes insurance/fees", "API")
+Rel(mobileServices, webPlatform, "Creates bookings", "API")
+
+Rel(paymentSystem, paymentProvider, "Processes payments")
+Rel(mobileServices, mobileOS, "Push notifications")
+
+Lay_D(mobile, existing)
+
+@enduml

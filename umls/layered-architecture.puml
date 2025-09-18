@@ -1,0 +1,37 @@
+@startuml SimpleIntegrationArchitecture
+title Integration Architecture - Mobile MyTrailer
+
+package "Mobile App" {
+  [Mobile UI]
+}
+
+package "Mobile Services" {
+  [Mobile API]
+  [Mobile Domain]
+}
+
+package "Integration" {
+  [API Clients]
+}
+
+package "Existing MyTrailer" <<external>> {
+  [Inventory API]
+  [Booking API]
+  [Payment API]
+}
+
+package "Mobile Infrastructure" {
+  [Mobile DB]
+  [Event Bus]
+}
+
+[Mobile UI] --> [Mobile API] : Commands
+[Mobile API] --> [Mobile Domain] : Business Logic
+[Mobile API] --> [API Clients] : Integration
+[API Clients] --> [Inventory API] : Get Trailers
+[API Clients] --> [Booking API] : Create Booking
+[API Clients] --> [Payment API] : Process Payment
+[Mobile Domain] --> [Mobile DB] : Store Sessions
+[Mobile Domain] --> [Event Bus] : Mobile Events
+
+@enduml

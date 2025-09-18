@@ -1,0 +1,47 @@
+@startuml C4-Container-Simple
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title MyTrailer - Container Diagram (Mobile Integration)
+
+Person(customer, "Mobile Customer")
+
+System_Boundary(mobile, "Mobile Solution") {
+    Container(mobileApp, "Mobile App", "React Native", "GPS booking interface")
+    Container(mobileAPI, "Mobile API", "ASP.NET Core", "Mobile booking & location services")
+    ContainerDb(mobileDb, "Mobile DB", "SQL Server", "Sessions & cache")
+}
+
+System_Boundary(existing, "Existing MyTrailer Platform") {
+    Container(webPlatform, "Web Platform", "ASP.NET", "Existing rental system")
+    Container(inventoryAPI, "Inventory API", "REST", "Trailer data")
+    Container(paymentAPI, "Payment API", "REST", "Billing & payments")
+    ContainerDb(businessDb, "Business DB", "SQL Server", "Core business data")
+}
+
+Container(eventBus, "Event Bus", "RabbitMQ", "Event messaging")
+System_Ext(paymentProvider, "Payment Provider")
+
+' User interactions
+Rel(customer, mobileApp, "Books trailers")
+
+' Mobile flow
+Rel(mobileApp, mobileAPI, "API calls", "HTTPS")
+Rel(mobileAPI, mobileDb, "Store sessions")
+
+' Integration points
+Rel(mobileAPI, inventoryAPI, "Get trailer availability")
+Rel(mobileAPI, paymentAPI, "Process insurance")
+Rel(mobileAPI, eventBus, "Publish mobile events")
+
+' Existing system connections
+Rel(inventoryAPI, businessDb, "Read trailer data")
+Rel(paymentAPI, businessDb, "Manage payments")
+Rel(paymentAPI, paymentProvider, "External payments")
+
+' Event flow
+Rel(paymentAPI, eventBus, "Payment events")
+Rel(eventBus, mobileAPI, "System events")
+
+Lay_D(mobile, existing)
+
+@enduml

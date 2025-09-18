@@ -1,0 +1,42 @@
+@startuml C4-Component-MobileBooking
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Mobile Booking Service - Component Diagram
+
+Container(mobileApp, "Mobile App", "Mobile client")
+Container(apiGateway, "API Gateway", "Request routing")
+
+Container_Boundary(mobileBooking, "Mobile Booking Service") {
+    Component(bookingController, "Booking Controller", "ASP.NET Core", "Handles mobile booking HTTP requests")
+    Component(bookingAppService, "Booking Application Service", "C#", "Orchestrates mobile booking workflow")
+    Component(integrationService, "Integration Service", "C#", "Manages calls to existing APIs")
+    Component(mobileBookingAggregate, "Mobile Booking Aggregate", "C# Domain Model", "Mobile-specific booking logic and rules")
+    Component(eventPublisher, "Event Publisher", "C#", "Publishes mobile booking events")
+    ComponentDb(sessionStore, "Session Store", "Redis/SQL", "Mobile booking sessions and cache")
+}
+
+Container_Boundary(existing, "Existing Systems (External)") {
+    Component(inventoryApi, "Inventory API", "REST API", "Trailer availability")
+    Component(bookingApi, "Booking API", "REST API", "Core booking creation")
+    Component(paymentApi, "Payment API", "REST API", "Insurance processing")
+}
+
+Container(eventBus, "Event Bus", "Message infrastructure")
+
+Rel(mobileApp, apiGateway, "Mobile booking requests")
+Rel(apiGateway, bookingController, "Route requests")
+
+Rel(bookingController, bookingAppService, "Execute commands")
+Rel(bookingAppService, mobileBookingAggregate, "Domain operations")
+Rel(bookingAppService, integrationService, "Call external APIs")
+
+Rel(integrationService, inventoryApi, "Check availability")
+Rel(integrationService, bookingApi, "Create booking")
+Rel(integrationService, paymentApi, "Process insurance")
+
+Rel(mobileBookingAggregate, eventPublisher, "Raise domain events")
+Rel(eventPublisher, eventBus, "Publish events")
+
+Rel(bookingAppService, sessionStore, "Manage mobile sessions")
+
+@enduml
