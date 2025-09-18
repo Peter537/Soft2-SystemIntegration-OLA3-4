@@ -235,7 +235,7 @@ The Container diagram shows the integration architecture between new mobile serv
 The Component diagram zooms into the Mobile Booking Service to show how it integrates with existing systems while handling mobile-specific logic. The API layer handles mobile requests, the Application layer orchestrates integration with existing booking and inventory APIs, the Domain layer contains mobile-specific business rules (GPS, short-term constraints), and the Infrastructure layer manages integration with existing databases and message buses.
 
 
-# 7. Definition of Done (Skal lige ses på, vil hellere vi skriver denne sammen)
+# 7. Definition of Done
 
 - All domain events identified. ✅
 - Commands mapped to aggregates. ✅
@@ -266,5 +266,3 @@ The Component diagram zooms into the Mobile Booking Service to show how it integ
 - Database integration strategy: mobile service databases + API calls to existing systems
 - Authentication integration with existing customer identity system
 - Monitoring and logging integration with existing operational infrastructure
-
-# Conclusion?
