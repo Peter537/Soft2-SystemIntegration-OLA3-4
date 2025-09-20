@@ -1,0 +1,41 @@
+[
+    {
+        "Id": "LOC001-001",
+        "LocationId": "LOC001",
+        "TrailerNumber": 1,
+        "LocationName": "Jem og Fix Nørrebro",
+        "Address": "Nørrebrogade 123, Copenhagen",
+        "Status": "Booked",
+        "LastMaintenance": "2024-12-01T10:00:00Z",
+        "GPS": {
+            "Latitude": 55.6868,
+            "Longitude": 12.5606
+        }
+    },
+    {
+        "Id": "LOC001-002",
+        "LocationId": "LOC001",
+        "TrailerNumber": 2,
+        "LocationName": "Jem og Fix Nørrebro",
+        "Address": "Nørrebrogade 123, Copenhagen",
+        "Status": "Available",
+        "LastMaintenance": "2024-12-01T10:00:00Z",
+        "GPS": {
+            "Latitude": 55.6868,
+            "Longitude": 12.5606
+        }
+    },
+    {
+        "Id": "LOC002-001",
+        "LocationId": "LOC002",
+        "TrailerNumber": 1,
+        "LocationName": "Fog Østerbro",
+        "Address": "Østerbrogade 456, Copenhagen",
+        "Status": "Available",
+        "LastMaintenance": "2024-11-28T14:30:00Z",
+        "GPS": {
+            "Latitude": 55.7008,
+            "Longitude": 12.5751
+        }
+    }
+]

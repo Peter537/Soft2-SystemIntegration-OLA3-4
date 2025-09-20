@@ -1,0 +1,128 @@
+﻿@page "/"
+@inject ITrailerService TrailerService
+@inject IBookingService BookingService
+
+<PageTitle>MyTrailer - Home</PageTitle>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-8">
+            <h1>MyTrailer System</h1>
+            <p class="lead">Welcome to the MyTrailer short-term rental system. Find and book trailers near you!</p>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Book a Trailer</h5>
+                            <p class="card-text">Find available trailers at partner locations near you.</p>
+                            <a href="/book-trailer" class="btn btn-primary">Book Now</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">My Bookings</h5>
+                            <p class="card-text">View and manage your current and past bookings.</p>
+                            <a href="/my-bookings" class="btn btn-secondary">View Bookings</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <h3>Available Trailers</h3>
+                @if (trailers == null)
+                {
+                    <div class="d-flex justify-content-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                }
+                else if (!trailers.Any())
+                {
+                    <div class="alert alert-warning">No trailers available at the moment.</div>
+                }
+                else
+                {
+                    <div class="row">
+                        @foreach (var trailer in trailers)
+                        {
+                            <div class="col-md-6 col-lg-4 mb-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h6 class="card-title">@trailer.LocationName</h6>
+                                        <p class="card-text">
+                                            <small class="text-muted">Trailer #@trailer.TrailerNumber</small><br>
+                                            @trailer.Address<br>
+                                            <span class="badge @(trailer.Status == "Available" ? "bg-success" : "bg-danger")">
+                                                @trailer.Status
+                                            </span>
+                                        </p>
+                                        @if (trailer.Status == "Available")
+                                        {
+                                            <a href="/book-trailer" class="btn btn-sm btn-primary">Book This Trailer</a>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5>System Information</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Rental Rules</h6>
+                    <ul class="list-unstyled">
+                        <li>✓ Maximum 24-hour rental</li>
+                        <li>✓ Must return by midnight</li>
+                        <li>✓ Optional insurance: 50 DKK</li>
+                        <li>⚠️ Late return penalty applies</li>
+                    </ul>
+                    
+                    <h6 class="mt-3">Current Time</h6>
+                    <p class="text-muted">@DateTime.Now.ToString("yyyy-MM-dd HH:mm")</p>
+                    
+                    @if (activeBookings != null && activeBookings.Any())
+                    {
+                        <h6 class="mt-3">Active Bookings</h6>
+                        <p class="badge bg-info">@activeBookings.Count active booking(s)</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<Trailer>? trailers;
+    private List<Booking>? activeBookings;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            trailers = await TrailerService.GetAllTrailersAsync();
+            activeBookings = await BookingService.GetCustomerBookingsAsync("CUST001");
+            activeBookings = activeBookings?.Where(b => b.Status == "Active").ToList();
+        }
+        catch (Exception ex)
+        {
+            // Log error in real application
+            Console.WriteLine($"Error loading data: {ex.Message}");
+        }
+    }
+}

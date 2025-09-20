@@ -1,0 +1,22 @@
+[
+    {
+        "Id": "NOTIF001",
+        "CustomerId": "CUST001",
+        "Type": "BookingConfirmation",
+        "Title": "Booking Confirmed",
+        "Message": "Your trailer booking for LOC002-001 has been confirmed. Please return by 23:59 tonight.",
+        "Timestamp": "2024-12-15T13:45:00Z",
+        "IsRead": false,
+        "Priority": "High"
+    },
+    {
+        "Id": "NOTIF002",
+        "CustomerId": "CUST001",
+        "Type": "BookingReminder",
+        "Title": "Return Reminder",
+        "Message": "Remember to return your trailer by 23:59 to avoid excess fees.",
+        "Timestamp": "2024-12-15T20:00:00Z",
+        "IsRead": false,
+        "Priority": "Medium"
+    }
+]

@@ -1,0 +1,167 @@
+@page "/notifications"
+@inject INotificationService NotificationService
+
+<PageTitle>Notifications - MyTrailer</PageTitle>
+
+<div class="container">
+    <h2>Notifications</h2>
+    
+    @if (notifications == null)
+    {
+        <div class="d-flex justify-content-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading notifications...</span>
+            </div>
+        </div>
+    }
+    else if (!notifications.Any())
+    {
+        <div class="alert alert-info">
+            <h4>No Notifications</h4>
+            <p>You don't have any notifications at the moment.</p>
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-md-8">
+                @foreach (var notification in notifications)
+                {
+                    <div class="card mb-3 @(!notification.IsRead ? "border-primary" : "")">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <h5 class="card-title @(!notification.IsRead ? "fw-bold" : "")">
+                                        @notification.Title
+                                        @if (!notification.IsRead)
+                                        {
+                                            <span class="badge bg-primary ms-2">New</span>
+                                        }
+                                    </h5>
+                                    <p class="card-text">@notification.Message</p>
+                                    <small class="text-muted">
+                                        @notification.Timestamp.ToString("yyyy-MM-dd HH:mm") 
+                                        • Priority: @notification.Priority
+                                        • Type: @notification.Type
+                                    </small>
+                                </div>
+                                <div class="ms-3">
+                                    <span class="badge @GetPriorityBadgeClass(notification.Priority)">
+                                        @notification.Priority
+                                    </span>
+                                    @if (!notification.IsRead)
+                                    {
+                                        <button class="btn btn-sm btn-outline-primary ms-2" 
+                                                @onclick="() => MarkAsRead(notification.Id)">
+                                            Mark Read
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h6>Notification Summary</h6>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Total:</strong> @notifications.Count</p>
+                        <p><strong>Unread:</strong> @notifications.Count(n => !n.IsRead)</p>
+                        <p><strong>High Priority:</strong> @notifications.Count(n => n.Priority == "High")</p>
+                        
+                        @if (notifications.Any(n => !n.IsRead))
+                        {
+                            <button class="btn btn-sm btn-primary" @onclick="MarkAllAsRead">
+                                Mark All as Read
+                            </button>
+                        }
+                    </div>
+                </div>
+                
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h6>Notification Types</h6>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-unstyled">
+                            <li><span class="badge bg-success">BookingConfirmation</span> - Booking created successfully</li>
+                            <li><span class="badge bg-info">BookingReminder</span> - Return time approaching</li>
+                            <li><span class="badge bg-success">ReturnConfirmation</span> - Trailer returned on time</li>
+                            <li><span class="badge bg-warning">LateFee</span> - Late return penalty applied</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Notification>? notifications;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadNotifications();
+    }
+
+    private async Task LoadNotifications()
+    {
+        try
+        {
+            notifications = await NotificationService.GetCustomerNotificationsAsync("CUST001");
+        }
+        catch (Exception ex)
+        {
+            // Log error in real application
+            Console.WriteLine($"Error loading notifications: {ex.Message}");
+        }
+    }
+
+    private async Task MarkAsRead(string notificationId)
+    {
+        try
+        {
+            await NotificationService.MarkAsReadAsync(notificationId);
+            await LoadNotifications(); // Reload to update UI
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error marking notification as read: {ex.Message}");
+        }
+    }
+
+    private async Task MarkAllAsRead()
+    {
+        try
+        {
+            if (notifications == null) return;
+            
+            var unreadNotifications = notifications.Where(n => !n.IsRead).ToList();
+            foreach (var notification in unreadNotifications)
+            {
+                await NotificationService.MarkAsReadAsync(notification.Id);
+            }
+            
+            await LoadNotifications(); // Reload to update UI
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error marking all notifications as read: {ex.Message}");
+        }
+    }
+
+    private string GetPriorityBadgeClass(string priority)
+    {
+        return priority switch
+        {
+            "High" => "bg-danger",
+            "Medium" => "bg-warning",
+            "Low" => "bg-secondary",
+            _ => "bg-secondary"
+        };
+    }
+}

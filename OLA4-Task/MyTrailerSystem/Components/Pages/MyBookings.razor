@@ -1,0 +1,329 @@
+@page "/my-bookings"
+@inject IBookingService BookingService
+@inject INotificationService NotificationService
+
+<PageTitle>My Bookings - MyTrailer</PageTitle>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-8">
+            <h2>My Bookings</h2>
+            
+            @if (message != null)
+            {
+                <div class="alert @(isError ? "alert-danger" : "alert-success") alert-dismissible fade show" role="alert">
+                    @message
+                    <button type="button" class="btn-close" @onclick="ClearMessage"></button>
+                </div>
+            }
+
+            @if (bookings == null)
+            {
+                <div class="d-flex justify-content-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading bookings...</span>
+                    </div>
+                </div>
+            }
+            else if (!bookings.Any())
+            {
+                <div class="alert alert-info">
+                    <h4>No Bookings Found</h4>
+                    <p>You haven't made any bookings yet. <a href="/book-trailer" class="alert-link">Book a trailer now</a>!</p>
+                </div>
+            }
+            else
+            {
+                @foreach (var booking in bookings.OrderByDescending(b => b.CreatedAt))
+                {
+                    <div class="card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Booking #@booking.Id</h5>
+                            <span class="badge @GetStatusBadgeClass(booking)">@booking.Status</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Trailer Details</h6>
+                                    <p>
+                                        <strong>@booking.LocationName</strong><br>
+                                        Trailer #@booking.TrailerNumber<br>
+                                        <small class="text-muted">ID: @booking.TrailerId</small>
+                                    </p>
+                                    
+                                    <h6>Booking Period</h6>
+                                    <p>
+                                        <strong>From:</strong> @booking.BookingTime.ToString("yyyy-MM-dd HH:mm")<br>
+                                        <strong>Return by:</strong> @booking.ReturnTime.ToString("yyyy-MM-dd HH:mm")<br>
+                                        @if (booking.ActualReturnTime.HasValue)
+                                        {
+                                            <strong>Returned:</strong> @booking.ActualReturnTime.Value.ToString("yyyy-MM-dd HH:mm")<br>
+                                            @if (booking.IsLate(booking.ActualReturnTime.Value))
+                                            {
+                                                <span class="text-danger">⚠️ Returned late by @booking.GetLatenessDuration(booking.ActualReturnTime.Value).TotalHours.ToString("F1") hours</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-success">✅ Returned on time</span>
+                                            }
+                                        }
+                                        else if (booking.IsOverdue(currentTime))
+                                        {
+                                            <span class="text-danger">🚨 Overdue by @booking.GetLatenessDuration(currentTime).TotalHours.ToString("F1") hours</span>
+                                        }
+                                    </p>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>Cost Breakdown</h6>
+                                    <p>
+                                        Base rental: <strong>FREE</strong><br>
+                                        @if (booking.HasInsurance)
+                                        {
+                                            <text>Insurance: <strong>@booking.InsuranceFee.ToString("F2") DKK</strong><br></text>
+                                        }
+                                        @if (booking.ExcessFee > 0)
+                                        {
+                                            <text>Late fee: <strong class="text-danger">@booking.ExcessFee.ToString("F2") DKK</strong><br></text>
+                                        }
+                                        <hr>
+                                        Total: <strong class="@(booking.ExcessFee > 0 ? "text-danger" : "text-success")">@booking.TotalCost.ToString("F2") DKK</strong>
+                                    </p>
+                                    
+                                    @if (booking.Status == "Active")
+                                    {
+                                        <button class="btn btn-warning" @onclick="() => ShowReturnModal(booking)" disabled="@isReturning">
+                                            @if (isReturning && selectedBookingForReturn?.Id == booking.Id)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-2"></span>
+                                                <text>Processing...</text>
+                                            }
+                                            else
+                                            {
+                                                <text>Return Trailer</text>
+                                            }
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Current Time Simulator</h5>
+                </div>
+                <div class="card-body">
+                    <p>Use this to simulate different return times:</p>
+                    <div class="mb-3">
+                        <label class="form-label">Current Time</label>
+                        <input type="datetime-local" 
+                               class="form-control" 
+                               @bind="currentTime" 
+                               @oninput="OnCurrentTimeChanged" />
+                    </div>
+                    <small class="text-muted">
+                        Change this time to simulate what happens when you return a trailer at different times.
+                        Try returning after midnight to see the late fee calculation!
+                    </small>
+                </div>
+            </div>
+            
+            @if (recentNotifications?.Any() == true)
+            {
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h6>Recent Notifications</h6>
+                    </div>
+                    <div class="card-body">
+                        @foreach (var notification in recentNotifications.Take(3))
+                        {
+                            <div class="alert alert-sm @(notification.Priority == "High" ? "alert-warning" : "alert-info") mb-2">
+                                <small>
+                                    <strong>@notification.Title</strong><br>
+                                    @notification.Message
+                                </small>
+                            </div>
+                        }
+                        <a href="/notifications" class="btn btn-sm btn-outline-primary">View All</a>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Return Modal -->
+@if (showReturnModal && selectedBookingForReturn != null)
+{
+    <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Return Trailer</h5>
+                    <button type="button" class="btn-close" @onclick="HideReturnModal"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Returning:</strong> @selectedBookingForReturn.LocationName - Trailer #@selectedBookingForReturn.TrailerNumber</p>
+                    <p><strong>Must return by:</strong> @selectedBookingForReturn.ReturnTime.ToString("yyyy-MM-dd HH:mm")</p>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Return Time</label>
+                        <input type="datetime-local" 
+                               class="form-control" 
+                               @bind="returnTime" />
+                    </div>
+                    
+                    @if (returnTime > selectedBookingForReturn.ReturnTime)
+                    {
+                        <div class="alert alert-warning">
+                            <strong>Late Return Warning!</strong><br>
+                            You are returning @((returnTime - selectedBookingForReturn.ReturnTime).TotalHours.ToString("F1")) hours late.
+                            An excess fee of @(Math.Ceiling((returnTime - selectedBookingForReturn.ReturnTime).TotalHours) * 100) DKK will be applied.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-success">
+                            <strong>On-time Return!</strong><br>
+                            No additional fees will be applied.
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideReturnModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="ConfirmReturn" disabled="@isReturning">
+                        @if (isReturning)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            <text>Processing Return...</text>
+                        }
+                        else
+                        {
+                            <text>Confirm Return</text>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Booking>? bookings;
+    private List<Notification>? recentNotifications;
+    private DateTime currentTime = DateTime.Now;
+    private bool showReturnModal = false;
+    private Booking? selectedBookingForReturn;
+    private DateTime returnTime = DateTime.Now;
+    private bool isReturning = false;
+    private string? message;
+    private bool isError = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            bookings = await BookingService.GetCustomerBookingsAsync("CUST001");
+            recentNotifications = await NotificationService.GetCustomerNotificationsAsync("CUST001");
+        }
+        catch (Exception ex)
+        {
+            SetMessage($"Error loading data: {ex.Message}", true);
+        }
+    }
+
+    private void OnCurrentTimeChanged(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out DateTime newTime))
+        {
+            currentTime = newTime;
+            StateHasChanged();
+        }
+    }
+
+    private void ShowReturnModal(Booking booking)
+    {
+        selectedBookingForReturn = booking;
+        returnTime = currentTime;
+        showReturnModal = true;
+    }
+
+    private void HideReturnModal()
+    {
+        showReturnModal = false;
+        selectedBookingForReturn = null;
+    }
+
+    private async Task ConfirmReturn()
+    {
+        if (selectedBookingForReturn == null) return;
+
+        try
+        {
+            isReturning = true;
+            
+            var request = new ReturnTrailerRequest
+            {
+                BookingId = selectedBookingForReturn.Id,
+                ReturnTime = returnTime
+            };
+
+            var updatedBooking = await BookingService.ReturnTrailerAsync(request);
+            
+            // Reload data to show updated booking
+            await LoadData();
+            
+            if (updatedBooking.ExcessFee > 0)
+            {
+                SetMessage($"Trailer returned with late fee of {updatedBooking.ExcessFee:F2} DKK. Please contact Customer Service for payment.", false);
+            }
+            else
+            {
+                SetMessage("Trailer returned successfully!", false);
+            }
+            
+            HideReturnModal();
+        }
+        catch (Exception ex)
+        {
+            SetMessage($"Error returning trailer: {ex.Message}", true);
+        }
+        finally
+        {
+            isReturning = false;
+        }
+    }
+
+    private string GetStatusBadgeClass(Booking booking)
+    {
+        return booking.Status switch
+        {
+            "Active" => booking.IsOverdue(currentTime) ? "bg-danger" : "bg-success",
+            "Completed" => booking.ExcessFee > 0 ? "bg-warning" : "bg-secondary",
+            "Cancelled" => "bg-dark",
+            _ => "bg-secondary"
+        };
+    }
+
+    private void SetMessage(string? msg, bool error)
+    {
+        message = msg;
+        isError = error;
+        StateHasChanged();
+    }
+
+    private void ClearMessage()
+    {
+        message = null;
+        StateHasChanged();
+    }
+}

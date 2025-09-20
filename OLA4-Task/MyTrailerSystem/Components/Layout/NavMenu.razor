@@ -1,0 +1,86 @@
+﻿@using Microsoft.AspNetCore.Components.Routing
+@inject ITrailerService TrailerService
+@inject IBookingService BookingService
+@inject INotificationService NotificationService
+@inject IJSRuntime JSRuntime
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">MyTrailer System</a>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="book-trailer">
+                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Book Trailer
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="my-bookings">
+                <span class="bi bi-calendar-check-nav-menu" aria-hidden="true"></span> My Bookings
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="notifications">
+                <span class="bi bi-bell-nav-menu" aria-hidden="true"></span> Notifications
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <button class="nav-link btn btn-link text-start w-100" @onclick="ResetData" disabled="@isResetting">
+                <span class="bi bi-arrow-clockwise-nav-menu" aria-hidden="true"></span> 
+                @if (isResetting)
+                {
+                    <text>Resetting...</text>
+                }
+                else
+                {
+                    <text>Reset Data</text>
+                }
+            </button>
+        </div>
+    </nav>
+</div>
+
+@code {
+    private bool isResetting = false;
+
+    private async Task ResetData()
+    {
+        if (isResetting) return;
+
+        try
+        {
+            isResetting = true;
+            StateHasChanged();
+
+            await TrailerService.ResetDataAsync();
+            await BookingService.ResetDataAsync();
+            await NotificationService.ResetDataAsync();
+
+            await JSRuntime.InvokeVoidAsync("alert", "Data has been reset to default values!");
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error resetting data: {ex.Message}");
+        }
+        finally
+        {
+            isResetting = false;
+            StateHasChanged();
+        }
+    }
+}
+

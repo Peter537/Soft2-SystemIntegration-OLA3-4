@@ -1,0 +1,20 @@
+[
+    {
+        "Id": "BOOK001",
+        "CustomerId": "CUST001",
+        "CustomerName": "John Doe",
+        "CustomerEmail": "john.doe@email.com",
+        "TrailerId": "LOC001-001",
+        "LocationName": "Jem og Fix Nørrebro",
+        "TrailerNumber": 1,
+        "BookingTime": "2024-12-15T14:00:00Z",
+        "ReturnTime": "2024-12-15T23:59:59Z",
+        "ActualReturnTime": null,
+        "Status": "Active",
+        "HasInsurance": true,
+        "InsuranceFee": 50.0,
+        "ExcessFee": 0.0,
+        "TotalCost": 50.0,
+        "CreatedAt": "2024-12-15T13:45:00Z"
+    }
+]

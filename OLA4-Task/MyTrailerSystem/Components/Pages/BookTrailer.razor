@@ -1,0 +1,250 @@
+@page "/book-trailer"
+@inject ITrailerService TrailerService
+@inject IBookingService BookingService
+@inject NavigationManager Navigation
+
+<PageTitle>Book Trailer - MyTrailer</PageTitle>
+
+<div class="container">
+    <h2>Book a Trailer</h2>
+    
+    @if (message != null)
+    {
+        <div class="alert @(isError ? "alert-danger" : "alert-success") alert-dismissible fade show" role="alert">
+            @message
+            <button type="button" class="btn-close" @onclick="ClearMessage"></button>
+        </div>
+    }
+
+    <div class="row">
+        <div class="col-md-8">
+            @if (availableTrailers == null)
+            {
+                <div class="d-flex justify-content-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading available trailers...</span>
+                    </div>
+                </div>
+            }
+            else if (!availableTrailers.Any())
+            {
+                <div class="alert alert-warning">
+                    <h4>No Available Trailers</h4>
+                    <p>All trailers are currently booked. Please check back later or contact customer service.</p>
+                </div>
+            }
+            else
+            {
+                <h3>Available Trailers (@availableTrailers.Count)</h3>
+                <div class="row">
+                    @foreach (var trailer in availableTrailers)
+                    {
+                        <div class="col-md-6 mb-3">
+                            <div class="card @(selectedTrailer?.Id == trailer.Id ? "border-primary" : "")">
+                                <div class="card-body">
+                                    <h5 class="card-title">@trailer.LocationName</h5>
+                                    <h6 class="card-subtitle mb-2 text-muted">Trailer #@trailer.TrailerNumber</h6>
+                                    <p class="card-text">
+                                        📍 @trailer.Address<br>
+                                        🔧 Last maintenance: @trailer.LastMaintenance.ToString("yyyy-MM-dd")
+                                    </p>
+                                    <button class="btn @(selectedTrailer?.Id == trailer.Id ? "btn-primary" : "btn-outline-primary")" 
+                                            @onclick="() => SelectTrailer(trailer)">
+                                        @(selectedTrailer?.Id == trailer.Id ? "Selected" : "Select This Trailer")
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Booking Details</h5>
+                </div>
+                <div class="card-body">
+                    @if (selectedTrailer != null)
+                    {
+                        <h6>Selected Trailer</h6>
+                        <p><strong>@selectedTrailer.LocationName</strong><br>
+                           Trailer #@selectedTrailer.TrailerNumber</p>
+                        
+                        <form @onsubmit="CreateBooking" @onsubmit:preventDefault="true">
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Customer Name</label>
+                                <input type="text" @bind="bookingRequest.CustomerName" class="form-control" readonly />
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Customer Email</label>
+                                <input type="email" @bind="bookingRequest.CustomerEmail" class="form-control" readonly />
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Booking Time</label>
+                                <input type="datetime-local" @bind="bookingRequest.BookingTime" class="form-control" />
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Return Time (Must be before midnight)</label>
+                                <input type="datetime-local" @bind="bookingRequest.ReturnTime" class="form-control" max="@DateTime.Today.AddDays(1).AddMinutes(-1).ToString("yyyy-MM-ddTHH:mm")" />
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input type="checkbox" @bind="bookingRequest.HasInsurance" class="form-check-input" id="insuranceCheck" />
+                                    <label class="form-check-label" for="insuranceCheck">
+                                        Add Insurance (+50 DKK)
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h6>Total Cost</h6>
+                                <p class="h5 text-primary">@(bookingRequest.HasInsurance ? 50 : 0) DKK</p>
+                                <small class="text-muted">
+                                    @if (!bookingRequest.HasInsurance)
+                                    {
+                                        <text>Base rental: FREE</text>
+                                    }
+                                    else
+                                    {
+                                        <text>Base rental: FREE + Insurance: 50 DKK</text>
+                                    }
+                                </small>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-success w-100" disabled="@isBooking">
+                                @if (isBooking)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                    <text>Creating Booking...</text>
+                                }
+                                else
+                                {
+                                    <text>Create Booking</text>
+                                }
+                            </button>
+                        </form>
+                    }
+                    else
+                    {
+                        <p class="text-muted">Please select a trailer to continue with your booking.</p>
+                    }
+                </div>
+            </div>
+            
+            <div class="card mt-3">
+                <div class="card-body">
+                    <h6>Rental Information</h6>
+                    <ul class="list-unstyled small">
+                        <li>✓ Maximum 24-hour rental period</li>
+                        <li>✓ Must return by midnight (23:59)</li>
+                        <li>✓ Late return incurs penalty fees</li>
+                        <li>✓ Insurance covers damage and theft</li>
+                        <li>✓ Free cancellation up to booking time</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<Trailer>? availableTrailers;
+    private Trailer? selectedTrailer;
+    private CreateBookingRequest bookingRequest = new();
+    private bool isBooking = false;
+    private string? message;
+    private bool isError = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAvailableTrailers();
+        InitializeBookingRequest();
+    }
+
+    private async Task LoadAvailableTrailers()
+    {
+        try
+        {
+            availableTrailers = await TrailerService.GetAvailableTrailersAsync();
+        }
+        catch (Exception ex)
+        {
+            SetMessage($"Error loading trailers: {ex.Message}", true);
+        }
+    }
+
+    private void InitializeBookingRequest()
+    {
+        bookingRequest = new CreateBookingRequest
+        {
+            BookingTime = DateTime.Now,
+            ReturnTime = DateTime.Today.AddHours(23).AddMinutes(59),
+            HasInsurance = false
+        };
+    }
+
+    private void SelectTrailer(Trailer trailer)
+    {
+        selectedTrailer = trailer;
+        bookingRequest.TrailerId = trailer.Id;
+    }
+
+    private async Task CreateBooking()
+    {
+        if (selectedTrailer == null) return;
+
+        try
+        {
+            isBooking = true;
+            SetMessage(null, false);
+
+            // Validate return time
+            if (bookingRequest.ReturnTime > DateTime.Today.AddDays(1).AddMinutes(-1))
+            {
+                SetMessage("Return time must be before midnight of the same day.", true);
+                return;
+            }
+
+            if (bookingRequest.BookingTime >= bookingRequest.ReturnTime)
+            {
+                SetMessage("Return time must be after booking time.", true);
+                return;
+            }
+
+            var booking = await BookingService.CreateBookingAsync(bookingRequest);
+            SetMessage($"Booking created successfully! Booking ID: {booking.Id}", false);
+            
+            // Redirect to bookings page after a short delay
+            await Task.Delay(2000);
+            Navigation.NavigateTo("/my-bookings");
+        }
+        catch (Exception ex)
+        {
+            SetMessage($"Error creating booking: {ex.Message}", true);
+        }
+        finally
+        {
+            isBooking = false;
+        }
+    }
+
+    private void SetMessage(string? msg, bool error)
+    {
+        message = msg;
+        isError = error;
+        StateHasChanged();
+    }
+
+    private void ClearMessage()
+    {
+        message = null;
+        StateHasChanged();
+    }
+}
