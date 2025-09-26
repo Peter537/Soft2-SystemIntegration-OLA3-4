@@ -49,7 +49,7 @@
                                         🔧 Last maintenance: @trailer.LastMaintenance.ToString("yyyy-MM-dd")
                                     </p>
                                     <button class="btn @(selectedTrailer?.Id == trailer.Id ? "btn-primary" : "btn-outline-primary")" 
-                                            @onclick="() => SelectTrailer(trailer)">
+                                            @onclick="() => SelectTrailerReactive(trailer)">
                                         @(selectedTrailer?.Id == trailer.Id ? "Selected" : "Select This Trailer")
                                     </button>
                                 </div>
@@ -90,22 +90,26 @@
                             </div>
                             
                             <div class="mb-3">
-                                <label class="form-label">Return Time (Must be before midnight)</label>
-                                <input type="datetime-local" @bind="bookingRequest.ReturnTime" class="form-control" max="@DateTime.Today.AddDays(1).AddMinutes(-1).ToString("yyyy-MM-ddTHH:mm")" />
+                                <label class="form-label">Return Time</label>
+                                <input type="text" class="form-control" value="Must be returned before midnight or you will have to pay an extra fee!" readonly />
+                                <small class="text-danger">If you return after midnight, an excess fee will be charged.</small>
                             </div>
                             
                             <div class="mb-3">
                                 <div class="form-check">
-                                    <input type="checkbox" @bind="bookingRequest.HasInsurance" class="form-check-input" id="insuranceCheck" />
+                                    <input type="checkbox" class="form-check-input" id="insuranceCheck" @bind="bookingRequest.HasInsurance" />
                                     <label class="form-check-label" for="insuranceCheck">
                                         Add Insurance (+50 DKK)
                                     </label>
                                 </div>
+                                <small class="text-muted">
+                                    <span class="fw-bold">Note:</span> Insurance is optional, but most customers choose it. MyTrailer makes most of its profit from insurance fees. If you do not select insurance, you are fully responsible for any damage or loss during the rental period.
+                                </small>
                             </div>
                             
                             <div class="mb-3">
                                 <h6>Total Cost</h6>
-                                <p class="h5 text-primary">@(bookingRequest.HasInsurance ? 50 : 0) DKK</p>
+                                <p class="h5 text-primary">@((bookingRequest.HasInsurance ? 50 : 0)) DKK</p>
                                 <small class="text-muted">
                                     @if (!bookingRequest.HasInsurance)
                                     {
@@ -161,67 +165,146 @@
     private bool isBooking = false;
     private string? message;
     private bool isError = false;
+    // totalCost was unused; compute on the fly with GetTotalCost()
+
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public string? trailerId { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
         await LoadAvailableTrailers();
-        InitializeBookingRequest();
+        if (bookingRequest == null || string.IsNullOrEmpty(bookingRequest.CustomerName))
+        {
+            bookingRequest = new CreateBookingRequest
+            {
+                BookingTime = DateTime.Now,
+                ReturnTime = DateTime.Today.AddHours(23).AddMinutes(59),
+                HasInsurance = false
+            };
+        }
+        if (!string.IsNullOrEmpty(trailerId) && availableTrailers != null)
+        {
+            var trailer = availableTrailers.FirstOrDefault(t => t.Id == trailerId);
+            if (trailer != null)
+            {
+                selectedTrailer = trailer;
+                bookingRequest.TrailerId = trailer.Id;
+            }
+        }
     }
 
-    private async Task LoadAvailableTrailers()
+private async Task LoadAvailableTrailers()
+{
+    try
     {
-        try
-        {
-            availableTrailers = await TrailerService.GetAvailableTrailersAsync();
-        }
-        catch (Exception ex)
-        {
-            SetMessage($"Error loading trailers: {ex.Message}", true);
-        }
+        availableTrailers = await TrailerService.GetAvailableTrailersAsync();
     }
+    catch (Exception ex)
+    {
+        SetMessage($"Error loading trailers: {ex.Message}", true);
+    }
+}
 
     private void InitializeBookingRequest()
     {
-        bookingRequest = new CreateBookingRequest
+        if (bookingRequest == null || string.IsNullOrEmpty(bookingRequest.CustomerName))
         {
-            BookingTime = DateTime.Now,
-            ReturnTime = DateTime.Today.AddHours(23).AddMinutes(59),
-            HasInsurance = false
-        };
+            bookingRequest = new CreateBookingRequest
+            {
+                BookingTime = DateTime.Now,
+                ReturnTime = DateTime.Today.AddHours(23).AddMinutes(59),
+                HasInsurance = false
+            };
+        }
     }
 
     private void SelectTrailer(Trailer trailer)
     {
+        Navigation.NavigateTo($"/book-trailer?trailerId={trailer.Id}");
+    }
+
+    private void SelectTrailerReactive(Trailer trailer)
+    {
         selectedTrailer = trailer;
         bookingRequest.TrailerId = trailer.Id;
+        // Do NOT re-initialize bookingRequest here, so HasInsurance is preserved
+        StateHasChanged();
     }
 
     private async Task CreateBooking()
     {
         if (selectedTrailer == null) return;
 
+        isBooking = true;
+        SetMessage(null, false);
         try
         {
-            isBooking = true;
-            SetMessage(null, false);
-
             // Validate return time
             if (bookingRequest.ReturnTime > DateTime.Today.AddDays(1).AddMinutes(-1))
             {
                 SetMessage("Return time must be before midnight of the same day.", true);
+                isBooking = false;
                 return;
             }
 
             if (bookingRequest.BookingTime >= bookingRequest.ReturnTime)
             {
                 SetMessage("Return time must be after booking time.", true);
+                isBooking = false;
                 return;
             }
 
+            // Set booking start time to current simulated time if available
+            try {
+                var myBookingsPageType = Type.GetType("MyTrailerSystem.Components.Pages.MyBookings");
+                if (myBookingsPageType != null)
+                {
+                    var currentTimeProp = myBookingsPageType.GetProperty("currentTime");
+                    if (currentTimeProp != null)
+                    {
+                        var simulatedTime = currentTimeProp.GetValue(null);
+                        if (simulatedTime is DateTime dt)
+                        {
+                            bookingRequest.BookingTime = dt;
+                        }
+                    }
+                }
+            } catch {}
             var booking = await BookingService.CreateBookingAsync(bookingRequest);
+            if (booking == null || string.IsNullOrEmpty(booking.Id))
+            {
+                SetMessage("Booking creation failed: No booking returned from service.", true);
+                isBooking = false;
+                return;
+            }
+
+            // Directly write to bookings.json to ensure persistence
+            try
+            {
+                var dataPath = Path.Combine(AppContext.BaseDirectory, "Data", "bookings.json");
+                List<Booking> allBookings;
+                if (File.Exists(dataPath))
+                {
+                    var json = await File.ReadAllTextAsync(dataPath);
+                    allBookings = System.Text.Json.JsonSerializer.Deserialize<List<Booking>>(json) ?? new List<Booking>();
+                }
+                else
+                {
+                    allBookings = new List<Booking>();
+                }
+                allBookings.Add(booking);
+                var newJson = System.Text.Json.JsonSerializer.Serialize(allBookings, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(dataPath, newJson);
+            }
+            catch (Exception fileEx)
+            {
+                SetMessage($"Booking created but failed to write to bookings.json: {fileEx.Message}", true);
+                isBooking = false;
+                return;
+            }
+
             SetMessage($"Booking created successfully! Booking ID: {booking.Id}", false);
-            
-            // Redirect to bookings page after a short delay
             await Task.Delay(2000);
             Navigation.NavigateTo("/my-bookings");
         }
@@ -247,4 +330,8 @@
         message = null;
         StateHasChanged();
     }
+
+    // Insurance is bound directly to bookingRequest.HasInsurance via @bind on the checkbox input.
+
+    private int GetTotalCost() => bookingRequest.HasInsurance ? 50 : 0;
 }

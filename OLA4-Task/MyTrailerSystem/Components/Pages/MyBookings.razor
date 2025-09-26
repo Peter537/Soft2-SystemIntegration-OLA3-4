@@ -36,6 +36,7 @@
             {
                 @foreach (var booking in bookings.OrderByDescending(b => b.CreatedAt))
                 {
+                    var demoStartTime = currentTime.AddHours(-2);
                     <div class="card mb-3">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h5 class="mb-0">Booking #@booking.Id</h5>
@@ -50,10 +51,9 @@
                                         Trailer #@booking.TrailerNumber<br>
                                         <small class="text-muted">ID: @booking.TrailerId</small>
                                     </p>
-                                    
                                     <h6>Booking Period</h6>
                                     <p>
-                                        <strong>From:</strong> @booking.BookingTime.ToString("yyyy-MM-dd HH:mm")<br>
+                                        <strong>From:</strong> @demoStartTime.ToString("yyyy-MM-dd HH:mm")<br>
                                         <strong>Return by:</strong> @booking.ReturnTime.ToString("yyyy-MM-dd HH:mm")<br>
                                         @if (booking.ActualReturnTime.HasValue)
                                         {
@@ -157,7 +157,7 @@
 </div>
 
 <!-- Return Modal -->
-@if (showReturnModal && selectedBookingForReturn != null)
+@if (showReturnModal)
 {
     <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
         <div class="modal-dialog">
@@ -167,31 +167,18 @@
                     <button type="button" class="btn-close" @onclick="HideReturnModal"></button>
                 </div>
                 <div class="modal-body">
-                    <p><strong>Returning:</strong> @selectedBookingForReturn.LocationName - Trailer #@selectedBookingForReturn.TrailerNumber</p>
-                    <p><strong>Must return by:</strong> @selectedBookingForReturn.ReturnTime.ToString("yyyy-MM-dd HH:mm")</p>
-                    
+                    <p>
+                        <strong>Returning:</strong> 
+                        Trailer #1
+                    </p>
+                    <p>
+                        <strong>Must return by:</strong>
+                        26/09/2025 23:59
+                    </p>
                     <div class="mb-3">
                         <label class="form-label">Return Time</label>
-                        <input type="datetime-local" 
-                               class="form-control" 
-                               @bind="returnTime" />
+                        <input type="datetime-local" class="form-control" @bind="returnTime" />
                     </div>
-                    
-                    @if (returnTime > selectedBookingForReturn.ReturnTime)
-                    {
-                        <div class="alert alert-warning">
-                            <strong>Late Return Warning!</strong><br>
-                            You are returning @((returnTime - selectedBookingForReturn.ReturnTime).TotalHours.ToString("F1")) hours late.
-                            An excess fee of @(Math.Ceiling((returnTime - selectedBookingForReturn.ReturnTime).TotalHours) * 100) DKK will be applied.
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="alert alert-success">
-                            <strong>On-time Return!</strong><br>
-                            No additional fees will be applied.
-                        </div>
-                    }
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" @onclick="HideReturnModal">Cancel</button>
@@ -212,6 +199,45 @@
     </div>
 }
 
+<!-- Result Modal (guaranteed to render at end of file) -->
+@if (showResultModal)
+{
+    <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Return Result</h5>
+                    <button type="button" class="btn-close" @onclick="HideResultModal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    @if (returnTime <= selectedBookingForReturn?.ReturnTime)
+                    {
+                        <div>
+                            <span style="font-size:3rem;color:green;">&#10004;</span>
+                            <h4 class="text-success mt-3">Successfully returned the trailer.</h4>
+                        </div>
+                    }
+                    else
+                    {
+                        <div>
+                            <span style="font-size:3rem;color:orange;">&#9888;</span>
+                            <h4 class="text-warning mt-3">You are late!</h4>
+                            <p class="mt-2">
+                                <span style="color:blue;text-decoration:underline;">
+                                    Contact customer service on our website for fee-payment. Otherwise we will force you to watch an AI-generated version of the Bee movie.
+                                </span>
+                            </p>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" @onclick="HideResultModal">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private List<Booking>? bookings;
     private List<Notification>? recentNotifications;
@@ -220,6 +246,7 @@
     private Booking? selectedBookingForReturn;
     private DateTime returnTime = DateTime.Now;
     private bool isReturning = false;
+    private bool showResultModal = false;
     private string? message;
     private bool isError = false;
 
@@ -255,6 +282,7 @@
         selectedBookingForReturn = booking;
         returnTime = currentTime;
         showReturnModal = true;
+        StateHasChanged();
     }
 
     private void HideReturnModal()
@@ -270,28 +298,18 @@
         try
         {
             isReturning = true;
-            
             var request = new ReturnTrailerRequest
             {
                 BookingId = selectedBookingForReturn.Id,
                 ReturnTime = returnTime
             };
-
             var updatedBooking = await BookingService.ReturnTrailerAsync(request);
-            
-            // Reload data to show updated booking
             await LoadData();
-            
-            if (updatedBooking.ExcessFee > 0)
-            {
-                SetMessage($"Trailer returned with late fee of {updatedBooking.ExcessFee:F2} DKK. Please contact Customer Service for payment.", false);
-            }
-            else
-            {
-                SetMessage("Trailer returned successfully!", false);
-            }
-            
-            HideReturnModal();
+            showResultModal = true; // Always show result popup after return
+            StateHasChanged(); // Force UI update
+            // Only hide the return modal after showing the result modal
+            showReturnModal = false;
+            selectedBookingForReturn = null;
         }
         catch (Exception ex)
         {
@@ -301,6 +319,16 @@
         {
             isReturning = false;
         }
+    }
+
+    private void ShowResultModal()
+    {
+        showResultModal = true;
+    }
+
+    private void HideResultModal()
+    {
+        showResultModal = false;
     }
 
     private string GetStatusBadgeClass(Booking booking)

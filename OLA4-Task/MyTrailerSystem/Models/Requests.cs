@@ -8,7 +8,7 @@ namespace MyTrailerSystem.Models
         public string TrailerId { get; set; } = string.Empty;
         public DateTime BookingTime { get; set; } = DateTime.Now;
         public DateTime ReturnTime { get; set; } = DateTime.Today.AddHours(23).AddMinutes(59); // Default to midnight
-        public bool HasInsurance { get; set; } = false;
+        public bool HasInsurance { get; set; } = true;
     }
 
     public class ReturnTrailerRequest
