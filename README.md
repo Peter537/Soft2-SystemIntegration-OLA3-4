@@ -1,5 +1,9 @@
 # Soft2-SystemIntegration-OLA3-4
 
+## GitHub Link
+
+[https://github.com/Peter537/Soft2-SystemIntegration-OLA3-4](https://github.com/Peter537/Soft2-SystemIntegration-OLA3-4)
+
 ## Group
 
 - Oskar (Ossi-1337, cph-oo221)
